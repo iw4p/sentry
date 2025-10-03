@@ -33,21 +33,12 @@ function ManageReposPanel({
     organization.access.includes('org:write') ||
     organization.access.includes('org:admin');
 
-  const tempPatch: PreventAIConfig = {
-    github_organizations: {
-      'org-1': organization.preventAiConfigGithub as unknown as PreventAIOrgConfig,
-      'org-2': organization.preventAiConfigGithub as unknown as PreventAIOrgConfig,
-    },
-    default_org_config:
-      organization.preventAiConfigGithub as unknown as PreventAIOrgConfig,
-  };
-
-  const orgConfig = tempPatch.github_organizations[orgName];
+  const orgConfig = organization.preventAiConfigGithub?.github_organizations[orgName];
   if (!orgConfig) {
     return <Alert type="error">{t('Organization not found')}</Alert>;
   }
 
-  const {useOrgDefaults, repoConfig} = getRepoConfig(orgConfig, repoName);
+  const {doesUseOrgDefaults, repoConfig} = getRepoConfig(orgConfig, repoName);
 
   return (
     <SlideOverPanel
@@ -92,15 +83,12 @@ function ManageReposPanel({
         {updateError && (
           <Alert type="error">{'Could not update settings. Please try again.'}</Alert>
         )}
-        <Alert type="info">
-          {t(
-            'These settings can only be edited by users with the organization owner or manager role.'
-          )}
-        </Alert>
-        {useOrgDefaults && (
-          <Alert type="info">
-            {t('These settings are using the organization defaults.')}
-          </Alert>
+        {doesUseOrgDefaults && (
+          <Flex direction="column" padding="xl xl 0 xl">
+            <Alert type="info">
+              {t("This repository is using the organization's defaults")}
+            </Alert>
+          </Flex>
         )}
         <Flex direction="column" gap="xl" padding="2xl">
           {/* PR Review Feature */}
@@ -281,8 +269,8 @@ function ManageReposPanel({
 }
 
 interface GetRepoConfigResult {
+  doesUseOrgDefaults: boolean;
   repoConfig: PreventAIFeatureConfigsByName;
-  useOrgDefaults: boolean;
 }
 
 export function getRepoConfig(
@@ -292,13 +280,13 @@ export function getRepoConfig(
   const repoConfig = orgConfig.repo_overrides[repoName];
   if (repoConfig) {
     return {
-      useOrgDefaults: false,
+      doesUseOrgDefaults: false,
       repoConfig,
     };
   }
 
   return {
-    useOrgDefaults: true,
+    doesUseOrgDefaults: true,
     repoConfig: orgConfig.org_defaults,
   };
 }

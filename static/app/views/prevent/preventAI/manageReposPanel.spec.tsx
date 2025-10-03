@@ -1,6 +1,12 @@
 import {render, screen, userEvent} from 'sentry-test/reactTestingLibrary';
 
-import ManageReposPanel from 'sentry/views/prevent/preventAI/manageReposPanel';
+import type {
+  PreventAIFeatureConfigsByName,
+  PreventAIOrgConfig,
+} from 'sentry/types/prevent';
+import ManageReposPanel, {
+  getRepoConfig,
+} from 'sentry/views/prevent/preventAI/manageReposPanel';
 
 let mockUpdatePreventAIFeatureReturn: any = {};
 jest.mock('sentry/views/prevent/preventAI/hooks/useUpdatePreventAIFeature', () => ({
@@ -114,5 +120,111 @@ describe('ManageReposPanel', () => {
       enabled: false, // Toggle from true to false
     });
     expect(mockRefetch).toHaveBeenCalled();
+  });
+
+  describe('getRepoConfig', () => {
+    it('returns repo override config when present', () => {
+      const orgConfig: PreventAIOrgConfig = {
+        org_defaults: {
+          bug_prediction: {
+            enabled: true,
+            triggers: {on_command_phrase: true, on_ready_for_review: true},
+          },
+          test_generation: {
+            enabled: false,
+            triggers: {on_command_phrase: true, on_ready_for_review: false},
+          },
+          vanilla: {
+            enabled: true,
+            triggers: {on_command_phrase: true, on_ready_for_review: false},
+          },
+        },
+        repo_overrides: {
+          'repo-1': {
+            bug_prediction: {
+              enabled: false,
+              triggers: {on_command_phrase: true, on_ready_for_review: false},
+            },
+            test_generation: {
+              enabled: true,
+              triggers: {on_command_phrase: true, on_ready_for_review: false},
+            },
+            vanilla: {
+              enabled: false,
+              triggers: {on_command_phrase: true, on_ready_for_review: false},
+            },
+          },
+        },
+      };
+      const result = getRepoConfig(orgConfig, 'repo-1');
+      expect(result).toEqual({
+        doesUseOrgDefaults: false,
+        repoConfig: {
+          bug_prediction: {
+            enabled: false,
+            triggers: {on_command_phrase: true, on_ready_for_review: false},
+          },
+          test_generation: {
+            enabled: true,
+            triggers: {on_command_phrase: true, on_ready_for_review: false},
+          },
+          vanilla: {
+            enabled: false,
+            triggers: {on_command_phrase: true, on_ready_for_review: false},
+          },
+        },
+      });
+    });
+
+    it('returns org defaults when repo override is not present', () => {
+      const orgConfig: PreventAIOrgConfig = {
+        org_defaults: {
+          bug_prediction: {
+            enabled: true,
+            triggers: {on_command_phrase: true, on_ready_for_review: false},
+          },
+          test_generation: {
+            enabled: false,
+            triggers: {on_command_phrase: false, on_ready_for_review: false},
+          },
+          vanilla: {
+            enabled: true,
+            triggers: {on_command_phrase: false, on_ready_for_review: false},
+          },
+        },
+        repo_overrides: {},
+      };
+      const result = getRepoConfig(orgConfig, 'repo-2');
+      expect(result).toEqual({
+        doesUseOrgDefaults: true,
+        repoConfig: orgConfig.org_defaults,
+      });
+    });
+
+    it('returns org defaults when repo_overrides is undefined', () => {
+      const orgConfig: PreventAIOrgConfig = {
+        org_defaults: {
+          bug_prediction: {
+            enabled: false,
+            triggers: {on_command_phrase: false, on_ready_for_review: false},
+          },
+          test_generation: {
+            enabled: true,
+            triggers: {on_command_phrase: false, on_ready_for_review: false},
+          },
+          vanilla: {
+            enabled: false,
+            triggers: {on_command_phrase: false, on_ready_for_review: false},
+          },
+        },
+        // @ts-expect-error purposely passing undefined for test
+        repo_overrides: undefined,
+      };
+      const result = getRepoConfig(orgConfig, 'repo-1');
+      expect(result).toEqual({
+        doesUseOrgDefaults: true,
+        repoConfig: orgConfig.org_defaults,
+      });
+    });
   });
 });
